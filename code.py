@@ -9,14 +9,18 @@ fan = pwmio.PWMOut(board.GP25)
 knob = rotaryio.IncrementalEncoder(board.GP3, board.GP4)
 
 offset = 2
+measurements = 750
+sensortrigger = 67
+maxspeed = 40000
+fantimer = 1 # Minutes
 
 def sens_voltage():
-    return (sensLevel.value / 65535 * sensLevel.reference_voltage)
+    return (sensLevel.value / 65536 * sensLevel.reference_voltage)
 
 def sens_pvoltage():
+    global measurements
     while True:
         result = 0
-        measurements = 500
         for x in range(measurements):
             voltage = sens_voltage()
             result = result + voltage
@@ -25,6 +29,8 @@ def sens_pvoltage():
         return int((round((result*100),0)))
 
 def noctua(speed):
+    if speed > maxspeed:
+        speed = maxspeed
     if speed > 65535:
         speed = 65535
     fan.duty_cycle = speed
@@ -41,14 +47,19 @@ def encoder():
     return step
 
 
-fantimer = 60
 counter = 0
 smoke = False
 trigger = False
 oldstep = 0
+oldsens = 0
 while True:
     sens = sens_pvoltage();
-    if trigger is False and sens > 61:
+
+    if sens is not oldsens:
+        oldsens = sens
+        print("Sensor Value: " + str(sens))
+
+    if trigger is False and sens > 64:
         print("Trigger Fan Sensor: " + str(sens))
         offset = offset + 10
         smoke = True
@@ -57,7 +68,7 @@ while True:
         counter = counter + 1
         smoke = False
 
-    if smoke is False and trigger is True and counter > (fantimer * 1000):
+    if smoke is False and trigger is True and counter > ((fantimer*60) * (1000-measurements)):
         print("Disabling Fan Sensor: " + str(sens))
         offset = 2
         counter = 0
